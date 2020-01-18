@@ -258,7 +258,7 @@ This can be done with a two-phase commit approach:
   1. A Tenant Admin on the owning tenant initiates a transfer to
      the gaining tenant.
 
-  2. A Tenant Admin on the gainint tenant approves the pending
+  2. A Tenant Admin on the gaining tenant approves the pending
      (re-)registration of the agent under its ownership.
 
 This ensures that no agent is transferred without explicit
