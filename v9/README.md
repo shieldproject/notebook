@@ -16,7 +16,7 @@ protected systems, determine when backup jobs are to be run,
 execute and orchestrate all backup / restore operations, and track
 snapshots and their retention.
 
-A _Storage Gateway_ sits in front of one or more storage backends
+A _Storage Gateway_ sits in front of one or more storage providers
 (i.e., Amazon S3, WebDAV, BackBlaze, etc.) and offers secure
 access to blobs.  It is solely responsible for the compression,
 encryption, storage, and retrieval of data snapshots.
@@ -29,7 +29,7 @@ Communication Flows
 ===================
 
 The operation of SHIELD occurs along the following four
-commications paths:
+communications paths:
 
   1. Scheduler → Storage Gateway
   2. Scheduler → Agent
@@ -43,9 +43,20 @@ storage enumeration and store/retrieval provisioning.
 
 ### Scheduler → Agent
 
+The _Scheduler_ hands out task assignments to _Agents_, and keeps
+track of the progress, errors, and output of the execution of
+those tasks.
+
 ### Agent → Scheduler
 
+The _Agent_ talks to the _Scheduler_ to announce its availability
+for task assignment and execution, and to provide authentication
+and authorization proof.
+
 ### Agent → Storage Gateway
+
+The _Agent_ talks to the _Storage Gateway_ to store and retrieve
+archives during snapshot and replay operations, respectively.
 
 
 Static Configuration
@@ -293,16 +304,25 @@ to better understand what live configuration SHIELD supports.
 
 Agent administrative status must be one of the following:
 
-  - `unauthorized` - The agent has not been granted access to operate in this SHIELD.
-  - `authorized` - The agent is allowed to receive task assignments.
-  - `suspended` - The agents authorization has been temporarily suspended, and it should not be given task assignments.
+  - `unauthorized` - The agent has not been granted access to
+                     operate in this SHIELD.
+  - `authorized`   - The agent is allowed to receive task
+                     assignments.
+  - `suspended`    - The agents authorization has been temporarily
+                     suspended, and it should not be given task
+                     assignments.
 
 Agent health status must be one of the following:
 
-  - `pending` - The agent has never connected to this SHIELD.
-  - `online` - The agent is connected to the underlying SSH fabric.
-  - `unresponsive` - The agent has missed at least one heartbeat ping, but has not missed enough to be considered offline.
-  - `offline` - The agent either disconnected gracefully, or has missed enough heartbeat pings to be considered offline and forcibly disconnected.
+  - `pending`      - The agent has never connected to this SHIELD.
+  - `online`       - The agent is connected to the underlying SSH
+                     fabric.
+  - `unresponsive` - The agent has missed at least one heartbeat
+                     ping, but has not missed enough to be
+                     considered offline.
+  - `offline`      - The agent either disconnected gracefully, or
+                     has missed enough heartbeat pings to be
+                     considered offline and forcibly disconnected.
 
 
 ### Systems
@@ -332,8 +352,8 @@ Agent health status must be one of the following:
 | `notes`           | string  | An optional annotation for this snapshot, interpreted as Markdown. |
 | `starred`         | boolean | Whether or not an operator has starred this snapshot. |
 | `created_at`      | time    | When this snapshot was taken. |
-| `expires_at`      | time    | When this snapshot will expire, and can be removed from sturage. |
-| `purged_at`       | time    | When this snapshot was actually purged from storage. |
+| `expires_at`      | time    | When this snapshot will expire, and can be removed from storage. |
+| `expunged_at`     | time    | When this snapshot was actually expunged from storage. |
 | `deleted_at`      | time    | When this snapshot was deleted.  Deleted objects stay in the database, but do not show up to most queries. |
 | `compression`     | string  | A code indicating the compression algorithm used. |
 | `encryption`      | string  | A code indicating the encryption algorithm used. |
@@ -348,18 +368,29 @@ Snapshot URLs take the form:
 
 where:
 
-  - `$gateway` is the name of a SHIELD Storage Gateway cluster
-  - `$bucket` is the name of a storage bucket configuration in the named cluster
-  - `$key` is a backend-specific identifier for the snapshot data.  In S3, this is a path-like key that may contain slashes, i.e. `2020/05/24/backup1.snp`
+  - `$gateway` is the name of a SHIELD Storage Gateway cluster.
+  - `$bucket`  is the name of a storage bucket configuration in
+               the named cluster.
+  - `$key`     is a bucket-specific identifier for the snapshot
+               data.  In S3, this is a path-like key that may
+               contain slashes, i.e. `2020/05/24/backup1.snp`.
 
 Snapshot status must be one of the following:
 
-  - `allocated` - This snapshot has been allocated in the storage gateway, but has not been finalized (i.e. the upload step hasn't completed)
-  - `valid` - The snapshot is in storage, and is valid and not yet expired.
-  - `expired` - The snapshot is still in storage, but has passed its expiration date, and should be purged.
-  - `purging` - The snapshot is being purged from the storage gateway.
-  - `purged` - The snapshot is no longer resident in the storage gateway, and cannot be replayed.
-  - `HOLD` - An operator has placed an administrative hold on the snapshot, to prevent it from being purged, even after its expiration.
+  - `allocated` - This snapshot has been allocated in the storage
+                  gateway, but has not been finalized (i.e. the
+                  upload step hasn't completed).
+  - `valid`     - The snapshot is in storage, and is valid and not
+                  yet expired.
+  - `expired`   - The snapshot is still in storage, but has passed
+                  its expiration date, and should be expunged.
+  - `expunging` - The snapshot is being expunged from the storage
+                  gateway.
+  - `expunged`  - The snapshot is no longer resident in the storage
+                  gateway, and cannot be replayed.
+  - `HOLD`      - An operator has placed an administrative hold on
+                  the snapshot, to prevent it from being expunged,
+                  even after its expiration.
 
 
 ### Schedules
@@ -381,13 +412,18 @@ Snapshot status must be one of the following:
 | `retain_min_days`  | number  | The minimum number of days to retain a snapshot. |
 | `retain_max_days`  | number  | The maximum number of days to retain a snapshot. |
 | `status`           | enum    | The status of this schedule. |
-| `store`            | string  | The URL of the storage backend to store snapshots in. |
+| `store`            | string  | The URL of the storage bucket to store snapshots in. |
 
 Schedule status must be one of the following:
 
-  - `active` - The schedule is in force, and tasks will be scheduled according to its time specification.
-  - `paused` - The schedule is temporarily not in force, and no task scheduling will be done according to its parameters.
-  - `retired` - The schedule is permanently not in force, and no task scheduling will be done according to its parameters.
+  - `active`   - The schedule is in force, and tasks will be
+                 scheduled according to its time specification.
+  - `paused`   - The schedule is temporarily not in force, and no
+                 task scheduling will be done according to its
+                 parameters.
+  - `retired` - The schedule is permanently not in force, and no
+                task scheduling will be done according to its
+                parameters,
   - `deleted` - The schedule has been deleted.
 
 Storage URLs take the form:
@@ -396,8 +432,9 @@ Storage URLs take the form:
 
 where:
 
-  - `$gateway` is the name of a SHIELD Storage Gateway cluster
-  - `$bucket` is the name of a storage bucket configuration in the named cluster
+  - `$gateway` is the name of a SHIELD Storage Gateway cluster.
+  - `$bucket`  is the name of a storage bucket configuration in
+               the named cluster.
 
 
 
@@ -413,16 +450,23 @@ where:
 | `snapshot_id`      | ID      | The ID of the snapshot. |
 | `notes`            | string  | An optional annotation for this task, interpreted as Markdown. |
 | `created_at`       | time    | When the task was created (requested). |
-| `cancelled_at`     | time    | When the task was canceled by an operator (if it ever was). |
+| `canceled_at`      | time    | When the task was canceled by an operator (if it ever was). |
 | `started_at`       | time    | When the task was successfully dispatched to its agent. |
 | `stopped_at`       | time    | When the task stopped executing (either due to failure, or successful completion). |
 
 Task operation must be one of the following:
 
-  - `snapshot` - A snapshot of the indicated system is to be performed to the given store.  A snapshot will be pre-allocated to hold the data, so that we (the scheduler) can purge it should the agent crash halfway through a snapshot.
-  - `replay` - The indicated snapshot should be retrieved from storage and replayed to the given system.
+  - `snapshot` - A snapshot of the indicated system is to be
+                 performed to the given store.  A snapshot will be
+                 pre-allocated to hold the data, so that we (the
+                 scheduler) can expunge it should the agent crash
+                 halfway through a snapshot.
+  - `replay`   - The indicated snapshot should be retrieved from
+                 storage and replayed to the given system.
 
-Not all Snapshot fields have meaning; some of them only make sense in the context of a specific type of task (as denoted by `operation`).  Namely:
+Not all Snapshot fields have meaning; some of them only make sense
+in the context of a specific type of task (as denoted by
+`operation`).  Namely:
 
 | Operation    | system_id | schedule_id | snapshot_id |
 | ------------ | --------- | ----------- | ----------- |
@@ -431,13 +475,27 @@ Not all Snapshot fields have meaning; some of them only make sense in the contex
 
 Task status must be one of the following:
 
-  - `pending` - The task has been submitted, but has yet to be turned into an executing process by the scheduling core.  Tasks may stay in pending for a long time if, for example, the agent responsible for them is not found or because of concurrency concerns.  SHIELD will not, without explicit logic dictating otherwise, allow two or more tasks to execute against a single data system.
-  - `running` - The task has been assigned and dispatched to its agent, and is currently executing.
-  - `errored` - An internal error occurred, either within the agent software, or the scheduler software, that prevented the task from finishing successfully.
-  - `failed` - An external error occurred, either a loss of connectivity to the storage gateway, unability to communicate with the targeted data system, etc.
+  - `pending`   - The task has been submitted, but has yet to be
+                  turned into an executing process by the scheduling
+                  core.  Tasks may stay in pending for a long time
+                  if, for example, the agent responsible for them is
+                  not found or because of concurrency concerns.
+                  SHIELD will not, without explicit logic dictating
+                  otherwise, allow two or more tasks to execute
+                  against a single data system.
+  - `running`   - The task has been assigned and dispatched to its
+                  agent, and is currently executing.
+  - `errored`   - An internal error occurred, either within the
+                  agent software, or the scheduler software, that
+                  prevented the task from finishing successfully.
+  - `failed`    - An external error occurred, i.e. a loss of
+                  connectivity to the storage gateway, or
+                  inability to communicate with the data system.
   - `completed` - The task ran to completion without error.
-  - `canceled` - The task was administratively canceled by an operator.
-  - `handled` - A non-OK status has been manually acknowledged by an operator, and should not be considered an error (for the sake of monitoring / alerting / display.)
+  - `canceled`  - The task was canceled by an operator.
+  - `handled`   - A non-OK status has been manually acknowledged
+                  by an operator, and should not be considered an
+                  error (for monitoring / alerting / display.)
 
 The `created_at` timestamp is guaranteed to exist, and can never be nil.
 
@@ -461,6 +519,13 @@ No other combinations of (status, (nil? started\_at), (nil? stopped\_at)) are le
 SHIELD APIs
 ===========
 
-The SHIELD Scheduler and Storage Gateway components each have their own distinct but uniform APIs.  The Scheduler API paths are all prefixed with `/v9/scheduler`, and the Storage Gateway API paths all start with `/v9/storage-gateway` -- this unconventional nomenclature allows us to colocate the two components in a single endpoint, should operators desire that.
+The SHIELD Scheduler and Storage Gateway components each have
+their own distinct but uniform APIs.  The Scheduler API paths are
+all prefixed with `/v9/scheduler`, and the Storage Gateway API
+paths all start with `/v9/storage-gateway` -- this unconventional
+nomenclature allows us to co-locate both components in a single
+endpoint, should operators desire that.
 
-The Scheduler API is fully defined in the `api/scheduler.yml` Swagger definition that accompanies this README file.  Likewise, the Storage Gateway API is defined in `api/storage-gateway.yml`.
+The Scheduler API is fully defined in the `api/scheduler.yml`
+Swagger definition that accompanies this README file.  Likewise,
+the Storage Gateway API is defined in `api/storage-gateway.yml`.
