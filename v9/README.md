@@ -1,12 +1,10 @@
-SHIELD v9
-=========
+# SHIELD v9
 
 This is a **design document** intended to help flesh out the
 properties of the SHIELD v9 data protection system, before
 engineering work begins.
 
-Components
-==========
+## Components
 
 A SHIELD installation consists of 3 types of systems:
 _Schedulers_, _Storage Gateways_, and _Agents_.
@@ -25,8 +23,7 @@ An _Agent_ handles the communication with one or more protected
 systems, to extract the data from those systems into point-in-time
 snapshots.
 
-Communication Flows
-===================
+## Communication Flows
 
 The operation of SHIELD occurs along the following four
 communications paths:
@@ -59,10 +56,9 @@ The _Agent_ talks to the _Storage Gateway_ to store and retrieve
 archives during snapshot and replay operations, respectively.
 
 
-Static Configuration
-====================
+# Static Configuration
 
-### Storage Gateways
+## Storage Gateways
 
 _Storage Gateways_ are configured statically with the list of
 backing storage systems, and the credentials for accessing them.
@@ -172,7 +168,7 @@ backing storage systems, and the credentials for accessing them.
             caCertificate:
               file: /path/to/file
 
-### Scheduler
+## Scheduler
 
     ---
     # /etc/shield/scheduler.yml
@@ -218,7 +214,7 @@ backing storage systems, and the credentials for accessing them.
           caCertificate:
             literal: $VAULT_CA
 
-### Agent
+## Agent
 
     ---
     # /etc/shield/agent.yml
@@ -261,14 +257,13 @@ backing storage systems, and the credentials for accessing them.
             command: psql
 
 
-Database Schema
-===============
+# Database Schema
 
 This section looks at the database schema, in non-specific terms,
 to better understand what live configuration SHIELD supports.
 
 
-### Users
+## Users
 
 | Field          | Type   | Notes |
 | -------------- | ------ | ----- |
@@ -281,7 +276,7 @@ to better understand what live configuration SHIELD supports.
 | `grants`       | object | A description of granted access within this SHIELD. |
 
 
-### Agents
+## Agents
 
 | Field             | Type    | Notes |
 | ----------------- | ------- | ----- |
@@ -325,7 +320,7 @@ Agent health status must be one of the following:
                      considered offline and forcibly disconnected.
 
 
-### Systems
+## Systems
 
 | Field         | Type   | Notes |
 | ------------- | ------ | ----- |
@@ -342,7 +337,7 @@ Agent health status must be one of the following:
 | `folder`      | string | Absolute path to the "folder" into which this system should be displayed, for hierarchical organization schemes. |
 
 
-### Snapshots
+## Snapshots
 
 | Field             | Type    | Notes |
 | ----------------- | ------- | ----- |
@@ -393,7 +388,7 @@ Snapshot status must be one of the following:
                   even after its expiration.
 
 
-### Schedules
+## Schedules
 
 | Field              | Type    | Notes |
 | ------------------ | ------- | ----- |
@@ -438,7 +433,7 @@ where:
 
 
 
-### Tasks
+## Tasks
 
 | Field              | Type    | Notes |
 | ------------------ | ------- | ----- |
@@ -516,8 +511,7 @@ The `canceled_at` timestamp represents when cancellation was _requested_, not wh
 No other combinations of (status, (nil? started\_at), (nil? stopped\_at)) are legal.
 
 
-SHIELD APIs
-===========
+# SHIELD APIs
 
 The SHIELD Scheduler and Storage Gateway components each have
 their own distinct but uniform APIs.  The Scheduler API paths are
