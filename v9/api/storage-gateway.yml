@@ -1,0 +1,393 @@
+swagger: "2.0"
+info:
+  title: SHIELD Storage Gateway v9 API
+  version: "9.0"
+
+basePath: "/v9/storage-gateway"
+schemes: [https]
+
+definitions:
+  DateTime:
+    type: string
+    format: datetime
+
+  Reply:
+    type: object
+    required:
+      - ok
+      - code
+      - message
+    properties:
+      ok:
+        type: boolean
+      code:
+        type: string
+        format: opaque
+      message:
+        type: string
+      details:
+        type: object
+
+  Stream:
+    type: object
+    required:
+      - kind
+      - id
+      - token
+      - canon
+      - expires
+    properties:
+      kind:
+        type: string
+        enum:
+          - upload
+          - download
+      access:
+        type: object
+        properties:
+          id:
+            type: string
+            description: A one-time access ID
+          token:
+            type: string
+      canon:
+        type: string
+        example: "ssg:///bucket/path"
+      expires:
+        $ref: '#/definitions/DateTime'
+
+  StreamInfo:
+    type: object
+    required:
+      - kind
+      - id
+      - canon
+      - expires
+    properties:
+      kind:
+        type: string
+        enum:
+          - upload
+          - download
+      access:
+        type: object
+        properties:
+          id:
+            type: string
+            description: A one-time access ID
+      canon:
+        type: string
+        example: "ssg:///bucket/path"
+      expires:
+        $ref: '#/definitions/DateTime'
+      received:
+        type: number
+        format: bytes
+
+  Transaction:
+    type: object
+    required:
+      - kind
+    properties:
+      kind:
+        type: string
+        enum:
+          - upload
+          - download
+          - expunge
+      target:
+        type: string
+        example: "ssg:///bucket/path"
+
+  Segment:
+    type: object
+    properties:
+      data:
+        type: string
+        format: base64
+      eof:
+        type: boolean
+
+  Metrics:
+    type: object
+    properties:
+      operations:
+        type: object
+        properties:
+          total:
+            type: number
+            format: count
+            example: 412
+          upload:
+            type: number
+            format: count
+            example: 209
+          download:
+            type: number
+            format: count
+            example: 3
+          delete:
+            type: number
+            format: count
+            example: 200
+      segments:
+        type: object
+        properties:
+          total:
+            type: number
+            format: count
+            example: 312
+          bytes:
+            type: object
+            properties:
+              minimum:
+                type: number
+                format: bytes
+                example: 22
+              maximum:
+                type: number
+                format: bytes
+                example: 8192
+              median:
+                type: number
+                format: bytes
+                example: 768
+              sigma:
+                type: number
+                format: bytes
+                example: 224
+              95th:
+                type: number
+                format: bytes
+                example: 4096
+      transfer:
+        type: object
+        properties:
+          total:
+            type: number
+            format: count
+            example: 409178
+          upload:
+            type: number
+            format: count
+            example: 407131
+          download:
+            type: number
+            format: count
+            example: 2047
+
+tags:
+  - name: discovery
+  - name: control
+  - name: admin
+  - name: clients
+
+paths:
+  /info:
+    get:
+      tags: [discovery]
+      parameters:
+        - in: query
+          name: full
+          type: boolean
+          description: Include retired buckets in the response (defaults to only showing active buckets)
+
+      produces: &json [application/json]
+      responses:
+        200:
+          description: Success
+          schema:
+            type: object
+            properties:
+              cluster:
+                type: string
+                example: store1
+              api:
+                type: string
+                enum:
+                  - "9"
+              version:
+                type: string
+                example: "9.0.1-rc.4"
+              contact:
+                type: string
+                example: |-
+                  This gateway managed by CORE-OPS <core@ops.example.com>
+              buckets:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key:
+                      type: string
+                      example: "cloud1"
+                    kind:
+                      type: string
+                      enum:
+                        - s3
+                        - webdav
+                        - fs
+                      example: s3
+                    configuration:
+                      type: object
+                      example:
+                        region: "us-east-1"
+                        bucket: "cloud-backups"
+                        prefix: "/prod"
+                        encrypted: false
+                    description:
+                      type: string
+
+                    compression:
+                      type: string
+                      enum:
+                        - lzma
+                        - zlib
+                        - gzip
+                    encryption:
+                      type: string
+                      enum:
+                        - aes256-ctr
+                        - aes256-cfb
+                        - aes256-ofb
+                        - aes256-gcm
+
+                    vault:
+                      type: object
+                      properties:
+                        kind:
+                          type: string
+                          enum:
+                            - hashicorp
+                        online:
+                          type: boolean
+                        configuration:
+                          type: object
+                          example:
+                            endpoint: https://vault.example.com:8201
+                            ca: "-----BEGIN CERTIFICATE----- ..."
+                            prefix: /secret/archives/s3keys
+                        status:
+                          type: object
+                          example:
+                            connected: true
+                            sealed: false
+                            authenticated: true
+
+  /metrics:
+    parameters:
+      - in: query
+        name: bucket
+        type: string
+      - in: query
+        name: status
+        type: string
+        enum:
+          - active
+          - retired
+
+    get:
+      tags: [admin]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema: &metricsPayload
+            type: array
+            items:
+              type: object
+              properties:
+                bucket:
+                  type: string
+                metrics:
+                  $ref: '#/definitions/Metrics'
+
+    delete:
+      tags: [admin]
+      produces: *json
+      responses:
+        200:
+          description: Metrics reset
+          schema: *metricsPayload
+
+  /streams:
+    get:
+      tags: [admin]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/StreamInfo'
+
+  /control:
+    post:
+      tags: [control]
+      consumes: *json
+      produces: *json
+      parameters:
+        - in: body
+          name: transaction
+          required: true
+          schema:
+            $ref: '#/definitions/Transaction'
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Stream'
+        404:
+          description: Bucket or blob not found
+          schema:
+            $ref: '#/definitions/Reply'
+
+  /streams/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        type: string
+
+    delete:
+      tags: [admin]
+      produces: *json
+      responses:
+        200:
+          description: Stream deleted
+          schema:
+            $ref: '#/definitions/Reply'
+
+  /blob/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        type: string
+
+    get:
+      tags: [clients]
+      produces: [application/octet-string]
+      responses:
+        200:
+          description: Success
+        404:
+          description: Blob not found
+
+    post:
+      tags: [clients]
+      consumes: *json
+      produces: *json
+      parameters:
+        - in: body
+          name: segment
+          required: true
+          schema:
+            $ref: '#/definitions/Segment'
+
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Reply'

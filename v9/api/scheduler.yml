@@ -1,0 +1,1039 @@
+swagger: "2.0"
+info:
+  title: SHIELD v9 Scheduler API
+  version: "9.0"
+
+basePath: "/v9/scheduler"
+schemes: [https]
+
+definitions:
+  DateTime:
+    type: string
+    format: datetime
+
+  Reply:
+    type: object
+    required:
+      - ok
+      - code
+      - message
+    properties:
+      ok:
+        type: boolean
+      code:
+        type: string
+        format: opaque
+      message:
+        type: string
+      details:
+        type: object
+
+  Agent:
+    type: object
+    required:
+      - identity
+      - publicKey
+      - present
+      - thread
+      - health
+      - status
+    properties:
+      identity:
+        type: string
+      publicKey:
+        type: string
+        format: PEM
+      present:
+        type: boolean
+      assignment:
+        type: object
+        properties:
+          operation:
+            type: string
+          identifier:
+            type: string
+      thread:
+        type: string
+      health:
+        type: string
+        enum:
+          - unknown
+          - critical
+          - warning
+          - ok
+      status:
+        type: string
+        enum:
+          - new
+          - approved
+          - suspended
+      registeredAt:
+        $ref: '#/definitions/DateTime'
+      lastSeenAt:
+        $ref: '#/definitions/DateTime'
+      version:
+        type: string
+        format: version
+      capabilities:
+        type: object
+
+  AgentPatch:
+    type: object
+    properties:
+      status:
+        type: string
+        enum:
+          - approved
+          - suspended
+
+  Store:
+    type: object
+    required:
+      - code
+      - name
+      - description
+      - kind
+      - compression
+      - encryption
+    properties:
+      code:
+        type: string
+      name:
+        type: string
+      description:
+        type: string
+      kind:
+        type: string
+      compression:
+        type: string
+      encryption:
+        type: string
+
+  System:
+    type: object
+    required:
+      - id
+    properties:
+      id: &identifier
+        type: string
+        format: ID
+      name:
+        type: string
+      description:
+        type: string
+      schedules:
+        type: array
+        items:
+          $ref: '#/definitions/Schedule'
+      snapshots:
+        type: array
+        items:
+          $ref: '#/definitions/Snapshot'
+      tasks:
+        type: array
+        items:
+          $ref: '#/definitions/Task'
+
+  SystemSubmission:
+    type: object
+    required:
+      - name
+      - schedule
+    properties:
+      name:
+        type: string
+      description:
+        type: string
+      schedule:
+        $ref: '#/definitions/ScheduleSubmission'
+
+  SystemPatch:
+    type: object
+    properties:
+      name:
+        type: string
+      description:
+        type: string
+
+  Schedule:
+    type: object
+    properties:
+      id:
+        type: string
+        format: opaque
+      spec:
+        type: object
+        properties:
+          source:
+            type: string
+            format: timespec
+          parsed:
+            type: object
+      createdAt:
+        $ref: '#/definitions/DateTime'
+      updatedAt:
+        $ref: '#/definitions/DateTime'
+      lastRunAt:
+        $ref: '#/definitions/DateTime'
+      nextRunAt:
+        $ref: '#/definitions/DateTime'
+      retiredAt:
+        $ref: '#/definitions/DateTime'
+      retain:
+        type: object
+        properties:
+          maximumCount:
+            type: number
+          minimumCount:
+            type: number
+          minimumDays:
+            type: number
+          maximumDays:
+            type: number
+      status:
+        type: string
+        enum:
+          - active
+          - paused
+          - retired
+      storage:
+        $ref: '#/definitions/Store'
+
+  ScheduleSubmission:
+    type: object
+    properties:
+      spec:
+        type: string
+        format: timespec
+      retain:
+        type: object
+        properties:
+          maximumCount:
+            type: number
+          minimumCount:
+            type: number
+          minimumDays:
+            type: number
+          maximumDays:
+            type: number
+      status:
+        type: string
+        enum:
+          - active
+          - paused
+      storage:
+        type: string
+        format: opaque
+
+  SchedulePatch:
+    type: object
+    properties:
+      spec:
+        type: string
+        format: timespec
+      retain:
+        type: object
+        properties:
+          maximumCount:
+            type: number
+          minimumCount:
+            type: number
+          minimumDays:
+            type: number
+          maximumDays:
+            type: number
+      status:
+        type: string
+        enum:
+          - active
+          - paused
+      storage:
+        type: string
+        format: opaque
+
+  Snapshot:
+    type: object
+    required:
+      - id
+      - size
+      - compression
+      - encryption
+      - lifetime
+      - createdAt
+      - expungeAt
+      - hold
+      - storage
+    properties:
+      id: *identifier
+      size:
+        type: number
+        format: bytes
+      compression:
+        $ref: '#/definitions/CompressionType'
+      encryption:
+        $ref: '#/definitions/EncryptionType'
+      lifetime:
+        type: number
+        format: seconds
+      createdAt:
+        $ref: '#/definitions/DateTime'
+      expungeAt:
+        $ref: '#/definitions/DateTime'
+      hold:
+        $ref: '#/definitions/SnapshotHold'
+      objectID:
+        type: string
+        format: urn
+        example: "shield://cluster/bucket/id"
+
+  SnapshotPatch:
+    type: object
+    properties:
+      lifetime:
+        type: number
+        format: seconds
+      hold:
+        $ref: '#/definitions/SnapshotHold'
+
+  SnapshotHold:
+    type: string
+    enum:
+      - none
+      - administrative
+
+  CompressionType:
+    type: string
+    enum:
+      - none
+      - lzma
+      - zlib
+      - gzip
+
+  EncryptionType:
+    type: string
+    enum:
+      - none
+      - aes256-ctr
+      - aes256-ofb
+      - aes256-cfb
+
+  TaskOperation: &taskOperation
+    type: string
+    enum:
+      - snapshot
+      - replay
+
+  TaskStatus: &taskStatus
+    type: string
+    enum:
+      - pending
+      - running
+      - errored
+      - failed
+      - completed
+      - canceled
+      - handled
+
+  Task:
+    type: object
+    properties:
+      id:
+        type: string
+        format: opaque
+      note:
+        type: string
+      operation:
+        $ref: '#/definitions/TaskOperation'
+      parameters:
+        type: object
+        properties:
+          snapshot:
+            $ref: '#/definitions/Snapshot'
+          system:
+            $ref: '#/definitions/System'
+          schedule:
+            $ref: '#/definitions/Schedule'
+      log:
+        type: string
+      initiatedAt:
+        $ref: '#/definitions/DateTime'
+      executedAt:
+        $ref: '#/definitions/DateTime'
+      finishedAt:
+        $ref: '#/definitions/DateTime'
+      status:
+        $ref: '#/definitions/TaskStatus'
+
+  TaskPatch:
+    type: object
+    properties:
+      handled:
+        type: boolean
+      note:
+        type: string
+
+tags:
+  - name: systems
+  - name: schedules
+  - name: snapshots
+  - name: tasks
+  - name: storage
+  - name: agents
+
+paths:
+  /info:
+    get:
+      produces: &json [application/json]
+      responses:
+        200:
+          description: Success
+          schema:
+            type: object
+            properties:
+              api:
+                type: string
+                enum:
+                  - "9"
+              version:
+                type: string
+                example: "9.0.1-rc.4"
+              contact:
+                type: string
+                example: |-
+                  This scheduler managed by CORE-OPS <core@ops.example.com>
+              identity:
+                type: string
+                example: My Awesome SHIELD
+              components:
+                type: object
+                properties:
+                  database:
+                    type: object
+                    properties:
+                      kind:
+                        type: string
+                        enum:
+                          - postgres
+                          - mysql
+                      online:
+                        type: boolean
+                      configuration:
+                        type: object
+                        example:
+                          dsn: "postgres://localhost/pqgotest?sslmode=verify-full"
+                          username: shieldpg
+                      status:
+                        type: object
+                        example:
+                          connected: true
+                          authenticated: true
+                          schema: 20200606
+
+                  redis:
+                    type: object
+                    properties:
+                      online:
+                        type: boolean
+                      configuration:
+                        type: object
+                        example:
+                          endpoint: redis://rd.shield.example.com:6379
+                          authenticated: true
+                      status:
+                        type: object
+                        example:
+                          connected: true
+                          authenticated: true
+
+                  vault:
+                    type: object
+                    properties:
+                      kind:
+                        type: string
+                        enum:
+                          - hashicorp
+                      online:
+                        type: boolean
+                      configuration:
+                        type: object
+                        example:
+                          endpoint: https://vault.example.com:8201
+                          ca: "-----BEGIN CERTIFICATE----- ..."
+                          prefix: /secret/archives/s3keys
+                      status:
+                        type: object
+                        example:
+                          connected: true
+                          sealed: false
+                          authenticated: true
+
+  /storage:
+    get:
+      tags: [storage]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Store'
+
+  /storage/{code}:
+    parameters:
+      - name:     code
+        in:       path
+        required: true
+        type:     string
+
+    get:
+      tags: [storage]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Store'
+
+  /agents:
+    get:
+      tags: [agents]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Agent'
+
+  /agents/{identity}:
+    parameters:
+      - name:     identity
+        in:       path
+        required: true
+        type:     string
+        format:   process@host
+
+    get:
+      tags: [agents]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Agent'
+
+    patch:
+      tags: [agents]
+      consumes: *json
+      produces: *json
+      parameters:
+        - in: body
+          name: patch
+          schema:
+            $ref: '#/definitions/AgentPatch'
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Agent'
+
+    delete:
+      tags: [agents]
+      produces: *json
+      responses: &deleted
+        200:
+          description: Deleted
+          schema:
+            $ref: '#/definitions/Reply'
+        409:
+          description: Unable to delete
+          schema:
+            $ref: '#/definitions/Reply'
+        410:
+          description: Already deleted
+          schema:
+            $ref: '#/definitions/Reply'
+
+  /systems:
+    get:
+      tags: [systems]
+      produces: *json
+      parameters:
+        - in: query
+          name: include
+          type: array
+          items:
+            type: string
+            enum:
+              - schedules
+              - snapshots
+              - running-tasks
+              - finished-tasks
+      responses:
+        200:
+          description: Success
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/System'
+
+    post:
+      tags: [systems]
+      consumes: *json
+      produces: *json
+      parameters:
+        - in: body
+          name: system
+          required: true
+          schema:
+            $ref: '#/definitions/SystemSubmission'
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/System'
+
+  /systems/{system}:
+    parameters:
+      - name:     system
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+    get:
+      tags: [systems]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/System'
+
+    patch:
+      tags: [systems]
+      consumes: *json
+      produces: *json
+      parameters:
+        - in: body
+          name: system
+          required: true
+          schema:
+            $ref: '#/definitions/SystemPatch'
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/System'
+
+    delete:
+      tags: [systems]
+      produces: *json
+      responses: *deleted
+
+  /systems/{system}/schedules:
+    parameters:
+      - name:     system
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+    get:
+      tags: [schedules]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Schedule'
+
+    post:
+      tags: [schedules]
+      consumes: *json
+      produces: *json
+      parameters:
+        - in: body
+          name: schedule
+          required: true
+          schema:
+            $ref: '#/definitions/ScheduleSubmission'
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Schedule'
+
+  /systems/{system}/schedules/{id}:
+    parameters:
+      - name:     system
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+      - name:     id
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+    get:
+      tags: [schedules]
+      produces: *json
+      parameters:
+        - name: status
+          in: query
+          type: array
+          items:
+            type: string
+            enum:
+              - active
+              - paused
+              - retired
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Schedule'
+
+    patch:
+      tags: [schedules]
+      consumes: *json
+      produces: *json
+      parameters:
+        - in: body
+          name: schedule
+          required: true
+          schema:
+            $ref: '#/definitions/SchedulePatch'
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Schedule'
+
+    delete:
+      tags: [schedules]
+      produces: *json
+      responses: *deleted
+
+  /systems/{system}/snapshots:
+    parameters:
+      - name:     system
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+    get:
+      tags: [snapshots]
+      produces: *json
+      parameters:
+        - name: hold
+          in: query
+          type: array
+          items:
+            type: string
+            enum:
+              - none
+              - administrative
+        - name: store
+          in: query
+          type: string
+          format: opaque
+      responses:
+        200:
+          description: Success
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Snapshot'
+
+  /systems/{system}/snapshots/{id}:
+    parameters:
+      - name:     system
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+      - name:     id
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+    get:
+      tags: [snapshots]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Snapshot'
+
+    patch:
+      tags: [snapshots]
+      consumes: *json
+      produces: *json
+      parameters:
+        - in: body
+          name: snapshot
+          required: true
+          schema:
+            $ref: '#/definitions/SnapshotPatch'
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Snapshot'
+
+    delete:
+      tags: [snapshots]
+      produces: *json
+      responses: *deleted
+
+  /systems/{system}/tasks:
+    parameters:
+      - name:     system
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+    get:
+      tags: [tasks]
+      produces: *json
+      parameters:
+        - name: status
+          in: query
+          type: array
+          items: *taskStatus
+        - name: operation
+          in: query
+          type: array
+          items: *taskOperation
+      responses:
+        200:
+          description: Success
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Task'
+
+  /systems/{system}/tasks/{id}:
+    parameters:
+      - name:     system
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+      - name:     id
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+    get:
+      tags: [tasks]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Task'
+
+    patch:
+      tags: [tasks]
+      consumes: *json
+      produces: *json
+      parameters:
+        - in: body
+          name: task
+          required: true
+          schema:
+            $ref: '#/definitions/TaskPatch'
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Task'
+
+    delete:
+      tags: [tasks]
+      produces: *json
+      responses:
+        200:
+          description: Task canceled
+          schema:
+            $ref: '#/definitions/Reply'
+        409:
+          description: Task cancelation failed
+          schema:
+            $ref: '#/definitions/Reply'
+        410:
+          description: Task already finished or canceled
+          schema:
+            $ref: '#/definitions/Reply'
+
+  /storage/{code}/snapshots:
+    parameters:
+      - name:     code
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+    get:
+      tags: [snapshots]
+      produces: *json
+      parameters:
+        - name: hold
+          in: query
+          type: array
+          items:
+            type: string
+            enum:
+              - none
+              - administrative
+        - name: store
+          in: query
+          type: string
+          format: opaque
+      responses:
+        200:
+          description: Success
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Snapshot'
+
+  /storage/{code}/snapshots/{id}:
+    parameters:
+      - name:     code
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+      - name:     id
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+    get:
+      tags: [snapshots]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Snapshot'
+
+    patch:
+      tags: [snapshots]
+      consumes: *json
+      produces: *json
+      parameters:
+        - in: body
+          name: snapshot
+          required: true
+          schema:
+            $ref: '#/definitions/SnapshotPatch'
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Snapshot'
+
+    delete:
+      tags: [snapshots]
+      produces: *json
+      responses: *deleted
+
+  /storage/{code}/tasks:
+    parameters:
+      - name:     code
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+    get:
+      tags: [tasks]
+      produces: *json
+      parameters:
+        - name: status
+          in: query
+          type: array
+          items: *taskStatus
+        - name: operation
+          in: query
+          type: array
+          items: *taskOperation
+      responses:
+        200:
+          description: Success
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Task'
+
+  /storage/{code}/tasks/{id}:
+    parameters:
+      - name:     code
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+      - name:     id
+        in:       path
+        required: true
+        type:     string
+        format:   opaque
+
+    get:
+      tags: [tasks]
+      produces: *json
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Task'
+
+    patch:
+      tags: [tasks]
+      consumes: *json
+      produces: *json
+      parameters:
+        - in: body
+          name: task
+          required: true
+          schema:
+            $ref: '#/definitions/TaskPatch'
+      responses:
+        200:
+          description: Success
+          schema:
+            $ref: '#/definitions/Task'
+
+    delete:
+      tags: [tasks]
+      produces: *json
+      responses:
+        200:
+          description: Task canceled
+          schema:
+            $ref: '#/definitions/Reply'
+        409:
+          description: Task cancelation failed
+          schema:
+            $ref: '#/definitions/Reply'
+        410:
+          description: Task already finished or canceled
+          schema:
+            $ref: '#/definitions/Reply'
